@@ -1,0 +1,47 @@
+# ===== Dockerfile =====
+FROM ubuntu:22.04
+ENV DEBIAN_FRONTEND=noninteractive
+
+# --- System deps for Meshroom/AliceVision CLIs + Python API
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget ca-certificates \
+    libgl1-mesa-glx libglu1-mesa libxrandr2 libxinerama1 libxi6 libxrender1 \
+    libxxf86vm1 libxkbcommon0 libjpeg-turbo8 libpng16-16 libtiff5 ffmpeg \
+    python3 python3-pip python3-venv zip && \
+    rm -rf /var/lib/apt/lists/*
+
+# --- Download Meshroom prebuilt bundle from Hugging Face (your URL)
+ARG HF_FILE_URL="https://huggingface.co/datasets/ericos1234/alice_data/resolve/main/Meshroom-2023.3.0-linux.tar.gz"
+# If your dataset is private, pass: --build-arg HF_TOKEN=hf_xxx
+ARG HF_TOKEN
+RUN set -e; \
+    if [ -z "$HF_TOKEN" ]; then \
+      echo "Downloading Meshroom from $HF_FILE_URL"; \
+      wget -qO /tmp/meshroom.tar.gz "$HF_FILE_URL"; \
+    else \
+      echo "Downloading Meshroom (private)"; \
+      wget --header="Authorization: Bearer $HF_TOKEN" -qO /tmp/meshroom.tar.gz "$HF_FILE_URL"; \
+    fi && \
+    mkdir -p /opt/meshroom && \
+    tar -xzf /tmp/meshroom.tar.gz -C /opt/meshroom --strip-components=1 && \
+    rm /tmp/meshroom.tar.gz
+
+# Make Meshroom CLIs available (meshroom_photogrammetry, etc.)
+ENV PATH="/opt/meshroom:${PATH}"
+
+# --- Python deps for API (+ optional tiny UI if you add it)
+RUN python3 -m pip install --no-cache-dir fastapi uvicorn[standard] pillow gradio
+
+# --- App code (expects these files in the repo)
+WORKDIR /app
+COPY server.py /app/server.py
+COPY utils.py  /app/utils.py
+
+# --- Work dirs for jobs/results
+RUN mkdir -p /data/work /data/out
+
+# --- HF Spaces & many platforms listen on 7860 by default
+EXPOSE 7860
+
+# --- Start FastAPI app
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "7860"]
