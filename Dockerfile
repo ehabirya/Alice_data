@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # --- Meshroom bundle from HF (public or private)
 ARG HF_FILE_URL="https://huggingface.co/datasets/ericos1234/alice_data/resolve/main/Meshroom-2023.3.0-linux.tar.gz"
-ARG HF_TOKEN
+
 RUN set -eux; \
     if [ -z "${HF_TOKEN:-}" ]; then \
       echo "Downloading (public) $HF_FILE_URL"; \
