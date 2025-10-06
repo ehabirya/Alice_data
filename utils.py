@@ -11,8 +11,7 @@ def ensure_dirs(base="/data"):
 
 def save_jpeg(raw_bytes: bytes, path: str):
     img = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
-    # keep CPU-friendly sizes; adjust if you have more compute
-    max_side = 4096
+    max_side = 4096  # keep CPU-friendly; adjust as needed
     if max(img.size) > max_side:
         r = max_side / max(img.size)
         img = img.resize((int(img.size[0]*r), int(img.size[1]*r)))
@@ -28,15 +27,26 @@ def run_cmd(cmd, cwd=None):
 
 def strip_materials_to(src_obj_path: str) -> str:
     """
-    Create a temp OBJ file with all 'mtllib' and 'usemtl' lines removed,
-    so consumers get a pure geometry OBJ that doesn't reference textures.
-    Returns the path to the stripped temp file.
+    Create a temp OBJ with 'mtllib'/'usemtl' lines removed.
+    Returns path of the stripped temp OBJ.
     """
     fd, tmp_path = tempfile.mkstemp(suffix=".obj")
     os.close(fd)
     with open(src_obj_path, "r", errors="ignore") as s, open(tmp_path, "w") as d:
         for line in s:
-            if line.lstrip().startswith("mtllib") or line.lstrip().startswith("usemtl"):
+            ls = line.lstrip()
+            if ls.startswith("mtllib") or ls.startswith("usemtl"):
                 continue
             d.write(line)
     return tmp_path
+
+def convert_obj_to_glb(obj_path: str, glb_path: str):
+    """
+    Convert OBJ(+MTL/tex) to GLB using Assimp CLI.
+    Assimp resolves relative texture paths if run in OBJ directory.
+    """
+    obj_dir = os.path.dirname(obj_path) or "."
+    obj_name = os.path.basename(obj_path)
+    # assimp export <in> <out> -f glb2
+    cmd = ["assimp", "export", obj_name, glb_path, "-f", "glb2"]
+    run_cmd(cmd, cwd=obj_dir)
